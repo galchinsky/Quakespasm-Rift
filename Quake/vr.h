@@ -30,4 +30,6 @@ void VR_SetAngles(vec3_t angles);
 void VR_ResetOrientation();
 void VR_SetMatrices();
 
+extern int vr_current_eye;
+
 #endif

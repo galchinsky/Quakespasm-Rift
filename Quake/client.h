@@ -63,7 +63,7 @@ typedef struct
 
 #define	SIGNONS		4			// signon messages to receive before connected
 
-#define	MAX_DLIGHTS		64 //johnfitz -- was 32
+#define	MAX_DLIGHTS		256 //johnfitz -- was 32
 typedef struct
 {
 	vec3_t	origin;
@@ -76,7 +76,7 @@ typedef struct
 } dlight_t;
 
 
-#define	MAX_BEAMS	32 //johnfitz -- was 24
+#define	MAX_BEAMS	128  //johnfitz -- was 24
 typedef struct
 {
 	int		entity;
@@ -265,9 +265,9 @@ extern	cvar_t	m_forward;
 extern	cvar_t	m_side;
 
 
-#define	MAX_TEMP_ENTITIES	256		//johnfitz -- was 64
-#define	MAX_STATIC_ENTITIES	512		//johnfitz -- was 128
-#define	MAX_VISEDICTS		4096	// larger, now we support BSP2
+#define	MAX_TEMP_ENTITIES	2048		//johnfitz -- was 64
+#define	MAX_STATIC_ENTITIES	4096		//johnfitz -- was 128
+#define	MAX_VISEDICTS		8192	// larger, now we support BSP2
 
 extern	client_state_t	cl;
 

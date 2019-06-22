@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "vr.h"
 
+
 qboolean	r_cache_thrash;		// compatability
 
 vec3_t		modelorg, r_entorigin;
@@ -101,6 +102,7 @@ cvar_t	r_nolerp_list = {"r_nolerp_list", "progs/flame.mdl,progs/flame2.mdl,progs
 cvar_t	r_noshadow_list = {"r_noshadow_list", "progs/flame2.mdl,progs/flame.mdl,progs/bolt1.mdl,progs/bolt2.mdl,progs/bolt3.mdl,progs/laser.mdl", CVAR_NONE};
 
 extern cvar_t	r_vfog;
+
 //johnfitz
 
 //phoboslab -- cvars for vr
@@ -169,7 +171,7 @@ static void GLSLGamma_CreateShaders (void)
 		"\n"
 		"void main(void) {\n"
 		"	  vec4 frag = texture2D(GammaTexture, gl_TexCoord[0].xy);\n"
-		"	  frag.rgb = frag.rgb * ContrastValue;\n"
+		"	  frag.rgb = frag.rgb * (ContrastValue);\n"
 		"	  gl_FragColor = vec4(pow(frag.rgb, vec3(GammaValue)), 1.0);\n"
 		"}\n";
 
@@ -189,6 +191,7 @@ static void GLSLGamma_CreateShaders (void)
 GLSLGamma_GammaCorrect
 =============
 */
+//backported code from https://github.com/Fishbiter/Quakespasm-OpenVR to make contrast work
 void GLSLGamma_GammaCorrect (void)
 {
 	float smax, tmax;
@@ -200,8 +203,13 @@ void GLSLGamma_GammaCorrect (void)
 		return;
 
 // create render-to-texture texture if needed
-	if (!r_gamma_texture)
+	if (!r_gamma_texture || (r_gamma_texture_width < glwidth || r_gamma_texture_height < glheight))
 	{
+		if (r_gamma_texture)
+		{
+			glDeleteTextures(1, &r_gamma_texture);
+		}
+		
 		glGenTextures (1, &r_gamma_texture);
 		glBindTexture (GL_TEXTURE_2D, r_gamma_texture);
 
@@ -214,7 +222,7 @@ void GLSLGamma_GammaCorrect (void)
 			r_gamma_texture_height = TexMgr_Pad(r_gamma_texture_height);
 		}
 	
-		glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA8, r_gamma_texture_width, r_gamma_texture_height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
+		glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA8, r_gamma_texture_width, r_gamma_texture_height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	}
@@ -237,11 +245,12 @@ void GLSLGamma_GammaCorrect (void)
 // draw the texture back to the framebuffer with a fragment shader
 	GL_UseProgramFunc (r_gamma_program);
 	GL_Uniform1fFunc (gammaLoc, vid_gamma.value);
-	GL_Uniform1fFunc (contrastLoc, q_min(2.0, q_max(1.0, vid_contrast.value)));
+	GL_Uniform1fFunc (contrastLoc, q_min(10.0, q_max(0.001, vid_contrast.value)));
 	GL_Uniform1iFunc (textureLoc, 0); // use texture unit 0
 
 	glDisable (GL_ALPHA_TEST);
-	glDisable (GL_DEPTH_TEST);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
 
 	glViewport (glx, gly, glwidth, glheight);
 
@@ -259,6 +268,8 @@ void GLSLGamma_GammaCorrect (void)
 	glVertex2f (-1, 1);
 	glEnd ();
 	
+	glEnable(GL_CULL_FACE);
+
 	GL_UseProgramFunc (0);
 	
 // clear cached binding
@@ -629,7 +640,6 @@ R_DrawEntitiesOnList
 void R_DrawEntitiesOnList (qboolean alphapass) //johnfitz -- added parameter
 {
 	int		i;
-
 	if (!r_drawentities.value)
 		return;
 
@@ -652,7 +662,9 @@ void R_DrawEntitiesOnList (qboolean alphapass) //johnfitz -- added parameter
 		switch (currententity->model->type)
 		{
 			case mod_alias:
-				R_DrawAliasModel (currententity);
+			  if (1/*vr_current_eye == 1*/) { // a trick to render mosters only to one eye
+                         R_DrawAliasModel (currententity);
+                     }
 				break;
 			case mod_brush:
 				R_DrawBrushModel (currententity);

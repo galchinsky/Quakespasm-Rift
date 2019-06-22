@@ -3,6 +3,7 @@
 #include "quakedef.h"
 #include "vr.h"
 #include "vr_menu.h"
+#include <time.h>
 
 #define UNICODE 1
 #include <mmsystem.h>
@@ -10,13 +11,6 @@
 
 #include "OVR_CAPI_GL.h"
 #include "OVR_CAPI_Audio.h"
-
-#if SDL_MAJOR_VERSION < 2
-FILE *__iob_func() {
-  FILE result[3] = { *stdin,*stdout,*stderr };
-  return result;
-}
-#endif
 
 extern void VID_Refocus();
 
@@ -105,6 +99,8 @@ static ovrMirrorTextureDesc mirror_texture_desc;
 static GLuint mirror_fbo = 0;
 static int attempt_to_refocus_retry = 0;
 
+int vr_current_eye;
+
 
 // Wolfenstein 3D, DOOM and QUAKE use the same coordinate/unit system:
 // 8 foot (96 inch) height wall == 64 units, 1.5 inches per pixel unit
@@ -126,7 +122,39 @@ cvar_t vr_crosshair_alpha = {"vr_crosshair_alpha","0.25", CVAR_ARCHIVE};
 cvar_t vr_aimmode = {"vr_aimmode","1", CVAR_ARCHIVE};
 cvar_t vr_deadzone = {"vr_deadzone","30",CVAR_ARCHIVE};
 cvar_t vr_perfhud = {"vr_perfhud", "0", CVAR_ARCHIVE};
+cvar_t vr_angle_x = {"vr_angle_x", "0", CVAR_NONE};
+cvar_t vr_angle_y = {"vr_angle_y", "0", CVAR_NONE};
+cvar_t vr_contrast_left = {"vr_contrast_left", "1.0", CVAR_NONE};
+cvar_t vr_contrast_right = {"vr_contrast_right", "1.0", CVAR_NONE};
 
+
+ovrQuatf ovrQuatf_mul (ovrQuatf a, ovrQuatf b) { 
+    ovrQuatf result;
+    result.x = a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y;
+    result.y = a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x;
+    result.z = a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w;
+    result.w = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z;
+    return result;
+}
+
+ovrQuatf toQuaternion( float yaw, float pitch, float roll)
+// yaw (Z), pitch (Y), roll (X)
+{
+    // Abbreviations for the various angular functions
+    float cy = cosf(yaw * 0.5);
+    float sy = sinf(yaw * 0.5);
+    float cp = cosf(pitch * 0.5);
+    float sp = sinf(pitch * 0.5);
+    float cr = cosf(roll * 0.5);
+    float sr = sinf(roll * 0.5);
+
+    ovrQuatf q;
+    q.w = cy * cp * cr + sy * sp * sr;
+    q.x = cy * cp * sr - sy * sp * cr;
+    q.y = sy * cp * sr + cy * sp * cr;
+    q.z = sy * cp * cr - cy * sp * sr;
+    return q;
+}
 
 static qboolean InitOpenGLExtensions()
 {
@@ -182,9 +210,10 @@ fbo_t CreateFBO(int width, int height) {
 	ovr_CreateTextureSwapChainGL(session, &swap_desc, &fbo.swap_chain);	
 	ovr_GetTextureSwapChainLength(session, fbo.swap_chain, &swap_chain_length);
 	for( i = 0; i < swap_chain_length; ++i ) {
-		int swap_texture_id = 0;
+	  int swap_texture_id = 0;
 		ovr_GetTextureSwapChainBufferGL(session, fbo.swap_chain, i, &swap_texture_id);
 
+           fbo_texture = fbo.framebuffer;
 		glBindTexture(GL_TEXTURE_2D, swap_texture_id);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -296,6 +325,11 @@ void VR_Init()
 	Cvar_RegisterVariable (&vr_perfhud);
 	Cvar_SetCallback (&vr_perfhud, VR_Perfhud_f);
 
+	Cvar_RegisterVariable (&vr_angle_x);
+	Cvar_RegisterVariable (&vr_angle_y);
+	Cvar_RegisterVariable (&vr_contrast_left);
+	Cvar_RegisterVariable (&vr_contrast_right);
+
 	VR_Menu_Init();
 
 	// Set the cvar if invoked from a command line parameter
@@ -366,11 +400,7 @@ qboolean VR_Enable()
 		MMRESULT mmr = waveOutGetDevCaps(ovr_audio_id, &caps, sizeof(caps));
 		if (mmr == MMSYSERR_NOERROR)
 		{
-#if SDL_MAJOR_VERSION >= 2
-      char *name = SDL_iconv_string("UTF-8", "UTF-16LE", (char *)(caps.szPname), (SDL_wcslen((WCHAR *)caps.szPname)+1)*sizeof(WCHAR));
-#else
-      char *name = SDL_iconv_string("UTF-8", "UTF-16LE", (char *)(caps.szPname), (wcslen((WCHAR *)caps.szPname) + 1) * sizeof(WCHAR));
-#endif
+			char *name = SDL_iconv_string("UTF-8", "UTF-16LE", (char *)(caps.szPname), (SDL_wcslen((WCHAR *)caps.szPname)+1)*sizeof(WCHAR));
 			Cvar_SetQuick(&snd_device, name);
 		}
 	}
@@ -435,9 +465,9 @@ static void RenderScreenForCurrentEye()
 	r_refdef.fov_y = current_eye->fov_y;
 
 	SCR_UpdateScreenContent ();
+
 	ovr_CommitTextureSwapChain(session, current_eye->fbo.swap_chain);
 
-	
 	// Reset
 	glwidth = oldglwidth;
 	glheight = oldglheight;
@@ -542,7 +572,6 @@ void VR_UpdateScreenContent()
 	VectorCopy (cl.viewangles, r_refdef.viewangles);
 	VectorCopy (cl.aimangles, r_refdef.aimangles);
 
-
 	// Calculate eye poses
 	view_offset[0] = eyes[0].render_desc.HmdToEyeOffset;
 	view_offset[1] = eyes[1].render_desc.HmdToEyeOffset;
@@ -550,14 +579,24 @@ void VR_UpdateScreenContent()
 	ovr_CalcEyePoses(hmdState.HeadPose.ThePose, view_offset, render_pose);
 	eyes[0].pose = render_pose[0];
 	eyes[1].pose = render_pose[1];
-
+	
+	//here we should rotate eyes
+	ovrQuatf left_quaternion = toQuaternion( 0, -vr_angle_y.value*3.14/180, -vr_angle_x.value*3.14/180);
+	eyes[0].pose.Orientation = ovrQuatf_mul(eyes[0].pose.Orientation, left_quaternion);
+	ovrQuatf right_quaternion = toQuaternion( 0, vr_angle_y.value*3.14/180, vr_angle_x.value*3.14/180);
+	eyes[1].pose.Orientation = ovrQuatf_mul(eyes[1].pose.Orientation, right_quaternion);
 
 	// Render the scene for each eye into their FBOs
-	for( i = 0; i < 2; i++ ) {
-		current_eye = &eyes[i];
-		RenderScreenForCurrentEye();
-	}
-	
+	current_eye = &eyes[0];
+	// set global variable to use in RenderScreenForCurrentEye
+	vr_current_eye = 0;
+	//calling console commands in render code is not optimal so fixme
+	Cvar_SetValue("contrast", vr_contrast_left.value);
+	RenderScreenForCurrentEye();
+	current_eye = &eyes[1];
+	vr_current_eye = 1;
+	Cvar_SetValue("contrast", vr_contrast_right.value);
+	RenderScreenForCurrentEye();
 
 	// Submit the FBOs to OVR
 	viewScaleDesc.HmdSpaceToWorldScaleInMeters = meters_to_units;

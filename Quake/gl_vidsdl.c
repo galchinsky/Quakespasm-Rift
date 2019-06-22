@@ -180,10 +180,8 @@ static qboolean	gammaworks = false;	// whether hw-gamma works
 static int fsaa;
 
 void VID_Refocus() {
-#if SDL_MAJOR_VERSION >= 2
 	SDL_SetRelativeMouseMode(SDL_FALSE);
 	SDL_SetRelativeMouseMode(SDL_TRUE);
-#endif
 }
 
 /*
