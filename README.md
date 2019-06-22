@@ -1,5 +1,7 @@
 # Virtual prism mod for Quakespasm-Rift
 
+Download here: https://github.com/galchinsky/Quakespasm-Rift/releases
+
 This is a fork of "Quuke for Oculus Rift" with a couple of patches for people with strabismus and amblyopia. This gives a chance to play Oculus without prismatic correction glasses and achieve stronger fusion due to contrast penalization of working eye (as https://onlinelibrary.wiley.com/doi/full/10.1111/opo.12123 suggested). I'd like to share this but note that you use it on your own risk.
 
 I added 4 simple console commands and use it this way:
