@@ -1,3 +1,48 @@
+# Virtual prism mod for Quakespasm-Rift
+
+This is a fork of "Quuke for Oculus Rift" with a couple of patches for people with strabismus and amblyopia. This gives a chance to play Oculus without prismatic correction glasses and achieve stronger fusion due to contrast penalization of working eye (as https://onlinelibrary.wiley.com/doi/full/10.1111/opo.12123 suggested). I'd like to share this but note that you use it on your own risk.
+
+I added 4 simple console commands and use it this way:
+
+* Run the game. Quakespasm-Rift runs in VR-mode by default. If it starts in normal mode, enable 3rd party software in Oculus setup, also I have to run the app as administrator
+* The game should load straight into the very first map where there are no monsters and this is useful for initial setup.
+* Call the quake console using "~" button.
+* First, you should set different contrast for your lazy and fellow eyes. Lazy eye should be penalized with lower contrast. My right eye is lazy so I type:
+
+```
+vr_contrast_left 0.1
+vr_contrast_right 1.0
+```
+
+If your left eye is lazy you can type
+
+```
+vr_contrast_left 1.0
+vr_contrast_right 0.1
+```
+
+You should start to experience double vision even if you have some sort of amblyopia and the lazy eye is suppressed, thanks to contrast penalization. If you have alternating strabismus, I would recommend to penalize one eye to achieve stronger double vision.
+
+* When you see double vision, you are ready to set up your virtual prisms. There are 2 commands, `vr_angle_y` for horizontal correction (more common) and `vr_angle_x` for vertical correction. You should type them and check the 3d surrounding. The first level has convenient portal, lights and other objects. After some experiments, I use the following commands:
+
+```
+vr_angle_y 22
+vr_angle_x -4
+```
+
+You can set non-integer angle: `vr_angle_y 9.5`
+
+So, I added only 4 commands: `vr_contrast_left`, `vr_contrast_right`, `vr_angle_x`, `vr_angle_y`.
+
+## Building without IDE
+
+If you want to patch something without installing a monstrous 10 GB Microsoft IDE, there is a way to overcome this
+
+1. Install "Visual C++ 2015 Build Tools". Set up `VS140COMNTOOLS` environment variable to `C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools`
+2. Go to https://developer.oculus.com/downloads/pc/1.9.0/Oculus_SDK_for_Windows/ then download and extract it NEXT TO (not in) your Quakespasm-Rift folder. So there is an "OculusSDK" folder and a "QuakeSpasm-Rift" folder side-by-side.
+2. Run `cmd.exe`, cd to `c:\Program Files (x86)\MSBuild\14.0\Bin` and run `MSBuild [path-to]\Quakespasm-Rift\Windows\VisualStudio\quakespasm.sln /property:Configuration=Release`. It will build to `[path-to]\Quakespasm-Rift\Windows\VisualStudio\Build-quakespasm-sdl2\x86\Release`. I'm able to build only sdl version, the other one produces a lot of errors.
+3. Copy `id1` with Quakesparm-Rift config and game file from https://github.com/phoboslab/Quakespasm-Rift/releases 
+
 # Quake for Oculus Rift
 
 [Download Here](https://github.com/phoboslab/Quakespasm-Rift/releases)

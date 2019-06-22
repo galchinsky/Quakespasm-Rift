@@ -213,7 +213,6 @@ fbo_t CreateFBO(int width, int height) {
 	  int swap_texture_id = 0;
 		ovr_GetTextureSwapChainBufferGL(session, fbo.swap_chain, i, &swap_texture_id);
 
-           fbo_texture = fbo.framebuffer;
 		glBindTexture(GL_TEXTURE_2D, swap_texture_id);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -581,9 +580,9 @@ void VR_UpdateScreenContent()
 	eyes[1].pose = render_pose[1];
 	
 	//here we should rotate eyes
-	ovrQuatf left_quaternion = toQuaternion( 0, -vr_angle_y.value*3.14/180, -vr_angle_x.value*3.14/180);
+	ovrQuatf left_quaternion = toQuaternion( 0, -vr_angle_y.value/2*3.14/180, -vr_angle_x.value/2*3.14/180);
 	eyes[0].pose.Orientation = ovrQuatf_mul(eyes[0].pose.Orientation, left_quaternion);
-	ovrQuatf right_quaternion = toQuaternion( 0, vr_angle_y.value*3.14/180, vr_angle_x.value*3.14/180);
+	ovrQuatf right_quaternion = toQuaternion( 0, vr_angle_y.value/2*3.14/180, vr_angle_x.value/2*3.14/180);
 	eyes[1].pose.Orientation = ovrQuatf_mul(eyes[1].pose.Orientation, right_quaternion);
 
 	// Render the scene for each eye into their FBOs
